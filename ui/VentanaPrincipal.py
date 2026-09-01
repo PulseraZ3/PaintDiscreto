@@ -23,7 +23,7 @@ class VentanaPrincipal:
         self.frame_Coords.columnconfigure(1, weight=1)
 
         #Coords
-        self.label_Coords = tk.Label(self.frame_Coords, text="Coordenadas", font=self.fuente_Titulo,bg="white")
+        self.label_Coords = tk.Label(self.frame_Coords, text="Coordenadas", font=self.fuente_Titulo,bg="white",fg="black")
         self.label_Coords.grid(
             row=0,
             column=0,
@@ -33,7 +33,7 @@ class VentanaPrincipal:
         )
 
         #Label X
-        self.label_X= tk.Label(self.frame_Coords, text="X:", font=self.fuente_Texto,bg="white" )
+        self.label_X= tk.Label(self.frame_Coords, text="X:", font=self.fuente_Texto,bg="white" ,fg="black")
         self.label_X.grid(row=1, column=0, padx=10, pady=5)
 
         #entry coord X
@@ -41,7 +41,7 @@ class VentanaPrincipal:
         self.entry_X.grid(row=1, column=1, padx=10, pady=5)
 
         #Label Y
-        self.label_Y = tk.Label(self.frame_Coords, text="Y:", font=self.fuente_Texto,bg="white" )
+        self.label_Y = tk.Label(self.frame_Coords, text="Y:", font=self.fuente_Texto,bg="white",fg="black" )
         self.label_Y.grid(row=2, column=0, padx=10, pady=5)
         #entry coord y
         self.entry_Y = tk.Entry(self.frame_Coords, font=self.fuente_Texto,bg="white")
