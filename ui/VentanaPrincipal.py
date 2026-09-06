@@ -8,6 +8,7 @@ class VentanaPrincipal:
        self.color_panel="#d4d0c8"
        self.color_blanco="#ffffff"
        self.color_negro="#000000"
+       self.escala =25        #se tendria que testear
        self.ventana = tk.Tk()
        self.configurar_ventana()
        self.crear_componentes()
@@ -20,29 +21,28 @@ class VentanaPrincipal:
         alto = self.canvas.winfo_height()
         centro_x = ancho //2
         centro_y = alto //2
-        escala = 25 #se tendria que testear
 
         #
-        for x in range(centro_x, ancho, escala):
+        for x in range(centro_x, ancho, self.escala):
             self.canvas.create_line(
                 x,0,
                 x,alto,
                 fill="lightgray"
             )
-        for x in range(centro_x, 0, -escala):
+        for x in range(centro_x, 0, -self.escala):
             self.canvas.create_line(
                 x,0,
                 x,alto,
                 fill="lightgray"
             )
         #vertical
-        for y in range(centro_y, alto, escala):
+        for y in range(centro_y, alto, self.escala):
             self.canvas.create_line(
                 0,y,
                 ancho,y,
                 fill="lightgray"
             )
-        for y in range(centro_x, 0, -escala):
+        for y in range(centro_y, 0, -self.escala):
             self.canvas.create_line(
                 0,y,
                 ancho,y,
@@ -93,8 +93,26 @@ class VentanaPrincipal:
             text="0",
             font=self.fuente_Texto
         )
+    def aumentar_escala(self):
+        self.escala +=5
+        self.label_escala.config(text=str(self.escala))
+        self.dibujar_plano()
+    def disminuir_escala(self):
+        if self.escala>5:
+            self.escala -=5
+        self.label_escala.config(text=str(self.escala))
+        self.dibujar_plano()
 
-
+    def crear_label(self,padre,text):
+        return tk.Label(
+            padre,
+            text=text,
+            font=self.fuente_Texto,
+            fg=self.color_negro,
+            borderwidth=2,
+            padx=5,
+            pady=3
+        )
     def crear_boton(self,padre,text):
         return tk.Button(
             padre,
@@ -107,27 +125,106 @@ class VentanaPrincipal:
             padx=5,
             pady=3,
         )
+
+    def mostrar_menu_file(self):
+        self.menu_file.post(
+            self.boton_file.winfo_rootx(),
+            self.boton_file.winfo_rooty()+self.boton_file.winfo_width()-20,
+        )
+    def mostrar_menu_help(self):
+        self.menu_help.post(
+            self.boton_file.winfo_rootx(),
+            self.boton_file.winfo_rooty()+self.boton_file.winfo_height(),
+        )
     def crear_Menu(self):
-        self.barra_menu = tk.Menu(self.ventana)
+        ##refactorizar xd
+        self.barra_menu = tk.Frame(self.ventana,
+                                    bg=self.color_panel,
+                                    relief="raised",
+                                    borderwidth=2)
+        self.barra_menu.pack(side=tk.TOP,fill=tk.X)
         ##| file |
-        self.menu_file = tk.Menu(self.barra_menu, tearoff=0)
+        self.menu_file = tk.Menu(self.barra_menu,
+                                 tearoff=0,
+                                 bg=self.color_panel,
+                                 fg=self.color_negro,
+                                 activebackground="#000080",
+                                 activeforeground="white",
+                                 relief="raised",
+                                 borderwidth=2,
+                                 font=self.fuente_Texto)
+
         self.menu_file.add_command(label="Abrir .csv")
         self.menu_file.add_command(label="Abrir .xlsx")
         self.menu_file.add_command(label="Abrir .txt")
-        self.barra_menu.add_cascade(label="Files", menu=self.menu_file)
-        ## | credits |
-        self.menu_credits= tk.Menu(self.barra_menu, tearoff=0)
-        self.barra_menu.add_cascade(label="About", menu=self.menu_credits)
+        self.boton_file = tk.Button(
+            self.barra_menu,
+            text="File",
+            font=self.fuente_Texto,
+            bg=self.color_panel,
+            fg=self.color_negro,
+            relief="flat",
+            borderwidth=0,
+            padx=8,
+            pady=3,
+            command=self.mostrar_menu_file
+        )
+        self.boton_file.pack(side=tk.LEFT)
+
+        ## | menu_about|
+        self.boton_about = tk.Button(
+            self.barra_menu,
+            text="About",
+            font=self.fuente_Texto,
+            bg=self.color_panel,
+            fg=self.color_negro,
+            relief="flat",
+            borderwidth=0,
+            padx=8,
+            pady=3,
+            command=self.abrir_about
+        )
+
+        self.boton_about.pack(side=tk.LEFT)
+
         ## | help |
-        self.menu_help = tk.Menu(self.barra_menu, tearoff=0)
-        self.barra_menu.add_cascade(label="Help", menu=self.menu_help)
+        self.boton_help= tk.Button(
+            self.barra_menu,
+            text="Help",
+            font=self.fuente_Texto,
+            bg=self.color_panel,
+            fg=self.color_negro,
+            relief="flat",
+            borderwidth=0,
+            padx=8,
+            pady=3,
+            command=self.mostrar_menu_help
+        )
+        self.boton_help.pack(side=tk.LEFT)
+
         return self.barra_menu
+
+    def abrir_about(self):
+        venta_about = tk.Toplevel(self.ventana)
+        venta_about.title("About - Paint Discreto")
+        venta_about.resizable(False,False)
+        venta_about.transient(self.ventana)
+        venta_about.grab_set()
+        titulo = self.crear_label(venta_about,"Paint Discreto")
+        titulo.pack(pady=20)
+        creditos = self.crear_label(venta_about,"Creditos")
+        creditos.pack(pady=5)
+        autores = self.crear_label(venta_about, "Leonardo Favio Jimenez Layme (U202611731)\n\n Alex Guevara Herrera (U20261A781)\n\n Jamie Nicole Rodriguez Salcedo (U202520442)")
+        autores.configure(relief="raised",fg=self.color_negro)
+        autores.pack(pady=5, padx=10)
+        texto = self.crear_label(venta_about, "Editor gráfico para Matemática Discreta\n\n Proyecto desarrollado para UPC")
+        texto.pack(pady=10)
 
     def configurar_ventana(self):
         self.ventana.title("Paint Discreto")
-        self.ventana.geometry("1020x620")
+        self.ventana.geometry("1090x720")
         self.ventana.minsize(1020,600)
-        self.ventana.config(menu=self.crear_Menu())
+        self.crear_Menu()
         self.ventana.resizable(False,False)
 
     def componente_Coordenadas(self):
@@ -163,13 +260,12 @@ class VentanaPrincipal:
         estilo.configure("Reflexion.TComboBox", font=("MS Sans Serif", 11),padding=5)
         ##Buttons
         self.comboBoxReflexion = ttk.Combobox(self.frame_reflexion, values=["Eje x","Eje Y","Origen"],
-                                              state="readonly",style="Reflexion.TCombobox")
+                                              state="readonly",style="Reflexion.TCombobox", font=self.fuente_Texto)
         self.comboBoxReflexion.grid(row=1, column = 0, columnspan=2, sticky="ew", padx=5, pady=5)
         self.comboBoxReflexion.current(0)
         self.boton_Reflexion = self.crear_boton(
             self.frame_reflexion, "Aplicar reflexión")
         self.boton_Reflexion.grid(row=3,column=0,sticky="ew", padx=5, pady=2)
-
     def componente_homotecia(self):
         #contorno
         self.frame_homotecia= tk.LabelFrame(self.frame_derecho,text="Homotecia" ,font=self.fuente_Titulo,bg="gray94", border=1, borderwidth=2, relief="sunken",
@@ -187,7 +283,6 @@ class VentanaPrincipal:
         self.boton_homotecia = self.crear_boton(
             self.frame_homotecia,"Aplicar")
         self.boton_homotecia.grid(row=1,column=0,sticky="ew", padx=5, pady=2,columnspan=2)
-
     def componente_rotacion(self):
         self.labelFrame_rotacion = tk.LabelFrame(self.frame_derecho, text="Rotación", font=self.fuente_Titulo, bg="gray94",
                                              border=1, borderwidth=2, relief="sunken",
@@ -204,7 +299,32 @@ class VentanaPrincipal:
         self.boton_rotacion = self.crear_boton(
             self.labelFrame_rotacion, "Rotar")
         self.boton_rotacion.grid(row=1,column=0,sticky="ew", padx=5, pady=2,columnspan=2)
+    def componente_escala(self):
+        self.frame_escala = tk.Frame(
+            self.frame_derecho,
+        )
+        self.frame_escala.pack(fill=tk.X, pady=5, padx=5)
+        self.label_escala= self.crear_label(self.frame_escala,"Escala: ")
+        self.label_escala.grid(row=0, column=0,padx=5, pady=5)
+        self.boton_disminuir= self.crear_boton(
+            self.frame_escala,
+            "-"
+        )
+        self.boton_disminuir.config(command=self.disminuir_escala)
+        self.boton_disminuir.grid(row = 0, column=1, padx=5,pady=5)
 
+        self.label_escala = self.crear_label(
+            self.frame_escala,
+            str(self.escala)
+        )
+        self.label_escala.grid(row = 0, column=2, padx=5,pady=5)
+
+        self.boton_aumentar= self.crear_boton(
+            self.frame_escala,
+            "+"
+        )
+        self.boton_aumentar.config(command=self.aumentar_escala)
+        self.boton_aumentar.grid(row = 0, column=3, padx=5,pady=5)
     def crear_frame_izquierdo(self):
         # Frame izquierdo
         self.frame_izquierdo = tk.Frame(self.ventana, bg="gray94")
@@ -225,6 +345,7 @@ class VentanaPrincipal:
         self.component_reflexion()
         self.componente_homotecia()
         self.componente_rotacion()
+        self.componente_escala()
 
     def crear_componentes(self):
         self.crear_frame_izquierdo()
