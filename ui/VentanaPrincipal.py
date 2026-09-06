@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
+from PIL import Image, ImageTk
+
 class VentanaPrincipal:
     def __init__(self):
        self.fuente_Titulo = ("MS Sans Serif",14, "bold")
@@ -98,10 +100,8 @@ class VentanaPrincipal:
         alto = self.canvas.winfo_height()
         centro_x=ancho//2
         centro_y=alto//2
-        x = (event.x -centro_x)/self.escala
-        y = (centro_y-event.y)/self.escala
-        x =round(x,1)
-        y =round(y,1)
+        x = round((event.x -centro_x)/self.escala)
+        y = round((centro_y-event.y)/self.escala)
         self.label_coordenadas.config(
             text=f"Coord: ({x};{y})"
         )
@@ -146,7 +146,7 @@ class VentanaPrincipal:
         )
     def mostrar_menu_help(self):
         self.menu_help.post(
-            self.boton_file.winfo_rootx(),
+            self.boton_file.winfo_rootx()+125,
             self.boton_file.winfo_rooty()+self.boton_file.winfo_height(),
         )
     def crear_Menu(self):
@@ -167,9 +167,9 @@ class VentanaPrincipal:
                                  borderwidth=2,
                                  font=self.fuente_Texto)
 
-        self.menu_file.add_command(label="Abrir .csv")
-        self.menu_file.add_command(label="Abrir .xlsx")
-        self.menu_file.add_command(label="Abrir .txt")
+        self.menu_file.add_command(label="Open .csv")
+        self.menu_file.add_command(label="Open .xlsx")
+        self.menu_file.add_command(label="Open .txt")
         self.boton_file = tk.Button(
             self.barra_menu,
             text="File",
@@ -201,6 +201,15 @@ class VentanaPrincipal:
         self.boton_about.pack(side=tk.LEFT)
 
         ## | help |
+        self.menu_help = tk.Menu(self.barra_menu,
+                                 tearoff=0,
+                                 bg=self.color_panel,
+                                 fg=self.color_negro,
+                                 activebackground="#000080",
+                                 activeforeground="white",
+                                 relief="raised",
+                                 borderwidth=2,
+                                 font=self.fuente_Texto)
         self.boton_help= tk.Button(
             self.barra_menu,
             text="Help",
@@ -213,25 +222,58 @@ class VentanaPrincipal:
             pady=3,
             command=self.mostrar_menu_help
         )
+        self.menu_help.add_command(label="Exit")
+        self.menu_help.add_command(label="Reset")
         self.boton_help.pack(side=tk.LEFT)
 
         return self.barra_menu
 
     def abrir_about(self):
         venta_about = tk.Toplevel(self.ventana)
+        #ventana-----------------------------------------------------
         venta_about.title("About - Paint Discreto")
         venta_about.resizable(False,False)
         venta_about.transient(self.ventana)
         venta_about.grab_set()
+        venta_about.configure(background=self.color_panel)
+
+        #Titulo: Pain discreto-----------------------------------------------------
         titulo = self.crear_label(venta_about,"Paint Discreto")
-        titulo.pack(pady=20)
-        creditos = self.crear_label(venta_about,"Creditos")
-        creditos.pack(pady=5)
+        titulo.config(font=self.fuente_Texto, bg=self.color_panel, fg=self.color_negro, relief="raised", borderwidth=2, padx=10,pady=5)
+        titulo.pack(pady=5)
+        #Titulo: Creditos-----------------------------------------------------
+        creditos = self.crear_label(venta_about,"Authors")
+        creditos.config(font=self.fuente_Texto, bg=self.color_panel, fg=self.color_negro, relief="groove", borderwidth=2,
+                      padx=10, pady=5)
+        creditos.pack(pady=5,padx=15, fill=tk.X)
+        #Titulo: Nombres-----------------------------------------------------
         autores = self.crear_label(venta_about, "Leonardo Favio Jimenez Layme (U202611731)\n\n Alex Guevara Herrera (U20261A781)\n\n Jamie Nicole Rodriguez Salcedo (U202520442)")
-        autores.configure(relief="raised",fg=self.color_negro)
+        autores.configure(relief="raised",fg=self.color_negro, justify="center",font=self.fuente_Texto)
         autores.pack(pady=5, padx=10)
+        #Titulo: Profesor-----------------------------------------------------
+        profesor = self.crear_label(venta_about, "Teachers")
+        profesor.configure(fg=self.color_negro,bg=self.color_panel, relief="groove",borderwidth=2, padx=10,pady=5)
+        profesor.pack(pady=5,padx=10, fill=tk.X)
+        #Titulo: Nombre Profesor-----------------------------------------------------
+        nombreProfesor = self.crear_label(venta_about, "Antonio Marcos Medina Martínez\n\n Renan Muñoz Trelles")
+        nombreProfesor.configure(fg=self.color_negro,bg=self.color_panel,relief="raised",borderwidth=2, padx=10,pady=5)
+        nombreProfesor.pack(pady=5,padx=15, fill=tk.X)
+        #Titulo: Programa-----------------------------------------------------
+        autores.configure(font=self.fuente_Texto,bg=self.color_panel,fg=self.color_negro)
         texto = self.crear_label(venta_about, "Editor gráfico para Matemática Discreta\n\n Proyecto desarrollado para UPC")
-        texto.pack(pady=10)
+        texto.configure(font=self.fuente_Texto,bg=self.color_panel,fg=self.color_negro)
+        texto.pack(pady=(10,5))
+        #Titulo: Logo UPC-----------------------------------------------------
+        logoUpc = Image.open("UpcLogoPNG.png")
+        logoUpc = logoUpc.resize((100,100))
+
+        self.logoUpc = ImageTk.PhotoImage(logoUpc)
+        label_logo = tk.Label(
+            venta_about,
+            image=self.logoUpc,
+            bg=self.color_panel,
+        )
+        label_logo.pack(pady=(15,10))
 
     def configurar_ventana(self):
         self.ventana.title("Paint Discreto")

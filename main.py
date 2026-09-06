@@ -1,4 +1,5 @@
 from ui.VentanaPrincipal import VentanaPrincipal
+from PIL import Image, ImageTk
 
 def main():
     app = VentanaPrincipal()
