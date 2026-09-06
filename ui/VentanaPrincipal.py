@@ -93,6 +93,19 @@ class VentanaPrincipal:
             text="0",
             font=self.fuente_Texto
         )
+    def mostrar_coordenadas(self,event):
+        ancho = self.canvas.winfo_width()
+        alto = self.canvas.winfo_height()
+        centro_x=ancho//2
+        centro_y=alto//2
+        x = (event.x -centro_x)/self.escala
+        y = (centro_y-event.y)/self.escala
+        x =round(x,1)
+        y =round(y,1)
+        self.label_coordenadas.config(
+            text=f"Coord: ({x};{y})"
+        )
+
     def aumentar_escala(self):
         self.escala +=5
         self.label_escala.config(text=str(self.escala))
@@ -222,7 +235,7 @@ class VentanaPrincipal:
 
     def configurar_ventana(self):
         self.ventana.title("Paint Discreto")
-        self.ventana.geometry("1090x720")
+        self.ventana.geometry("1100x720")
         self.ventana.minsize(1020,600)
         self.crear_Menu()
         self.ventana.resizable(False,False)
@@ -325,6 +338,12 @@ class VentanaPrincipal:
         )
         self.boton_aumentar.config(command=self.aumentar_escala)
         self.boton_aumentar.grid(row = 0, column=3, padx=5,pady=5)
+        self.label_coordenadas=self.crear_label(
+            self.frame_escala,
+            "Coord: (0; 0)"
+        )
+        self.label_coordenadas.grid(row = 0, column=4, padx=5,pady=5)
+
     def crear_frame_izquierdo(self):
         # Frame izquierdo
         self.frame_izquierdo = tk.Frame(self.ventana, bg="gray94")
@@ -335,6 +354,7 @@ class VentanaPrincipal:
             bg="white", relief="sunken",borderwidth=2,highlightthickness=2,highlightcolor="black")
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.canvas.bind("<Configure>",self.dibujar_plano)
+        self.canvas.bind("<Motion>",self.mostrar_coordenadas)
 
     def crear_frame_derecho(self):
         # Frame derecho
