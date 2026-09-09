@@ -1,7 +1,8 @@
 import tkinter as tk
-from tkinter import ttk
+from Logica.Figura import Figura
+from tkinter import ttk, colorchooser
 from PIL import Image, ImageTk
-
+from miscellaneous.ColorChanger import ColorChanger
 class VentanaPrincipal:
     def __init__(self):
        self.fuente_Titulo = ("MS Sans Serif",14, "bold")
@@ -11,10 +12,89 @@ class VentanaPrincipal:
        self.color_blanco="#ffffff"
        self.color_negro="#000000"
        self.escala =25        #se tendria que testear
+       self.figura = Figura()
        self.ventana = tk.Tk()
+       self.color_changer= ColorChanger(self)
        self.configurar_ventana()
        self.crear_componentes()
 
+
+    def dibujar_figura(self):
+        puntos = self.figura.obtener_puntos()
+        ancho = self.canvas.winfo_width()
+        alto = self.canvas.winfo_height()
+
+        centro_x = ancho//2
+        centro_y = alto//2
+
+        for i, (x,y) in enumerate(puntos):
+            canvas_x = centro_x + x * self.escala
+            canvas_y = centro_y - y * self.escala
+            self.canvas.create_oval(
+                canvas_x - 4,
+                canvas_y - 4,
+                canvas_x + 4,
+                canvas_y + 4,
+                fill=self.color_changer.obtener_color()
+            )
+            self.canvas.create_text(
+                canvas_x + 10,
+                canvas_y - 10,
+                text=f"P:{i+1}",
+                font=self.fuente_Texto
+            )
+        if len(puntos) >= 2:
+            for i in range(len(puntos)-1):
+                x1,y1 = puntos[i]
+                x2,y2 = puntos[i+1]
+                canvas_x1 = centro_x +x1 * self.escala
+                canvas_y1 = centro_y - y1 * self.escala
+
+                canvas_x2 = centro_x + x2 * self.escala
+                canvas_y2 = centro_y - y2 * self.escala
+                self.canvas.create_line(
+                    canvas_x1,
+                    canvas_y1,
+                    canvas_x2,
+                    canvas_y2,
+                    fill="black",
+                    width=2
+                )
+
+        if len(puntos) >= 3:
+            x1, y1 = puntos[-1]
+            x2, y2 = puntos[0]
+
+            canvas_x1 = centro_x + x1 * self.escala
+            canvas_y1 = centro_y - y1 * self.escala
+
+            canvas_x2 = centro_x + x2 * self.escala
+            canvas_y2 = centro_y - y2 * self.escala
+
+            self.canvas.create_line(
+                canvas_x1,
+                canvas_y1,
+                canvas_x2,
+                canvas_y2,
+                fill="black",
+                width=2
+            )
+
+    def crear_punto(self):
+        try:
+            x = float(self.entry_X.get())
+            y = float(self.entry_Y.get())
+        except ValueError:
+            print("Ingrese valores numericos")
+            return
+        agregado = self.figura.agregar_punto(x,y)
+        if not agregado:
+            print("Ya existen 4 puntos")
+            return
+        print("punto agregado: ",x,y)
+        self.entry_X.delete(0, tk.END)
+        self.entry_Y.delete(0, tk.END)
+        self.dibujar_plano()
 
 
     def dibujar_plano(self,event=None):
@@ -95,6 +175,7 @@ class VentanaPrincipal:
             text="0",
             font=self.fuente_Texto
         )
+        self.dibujar_figura()
     def mostrar_coordenadas(self,event):
         ancho = self.canvas.winfo_width()
         alto = self.canvas.winfo_height()
@@ -144,9 +225,14 @@ class VentanaPrincipal:
             self.boton_file.winfo_rootx(),
             self.boton_file.winfo_rooty()+self.boton_file.winfo_width()-20,
         )
+    def mostrar_menu_config(self):
+        self.menu_config.post(
+            self.boton_file.winfo_rootx()+125,
+            self.boton_file.winfo_rooty()+self.boton_file.winfo_height(),
+        )
     def mostrar_menu_help(self):
         self.menu_help.post(
-            self.boton_file.winfo_rootx()+125,
+            self.boton_file.winfo_rootx()+200,
             self.boton_file.winfo_rooty()+self.boton_file.winfo_height(),
         )
     def crear_Menu(self):
@@ -199,7 +285,31 @@ class VentanaPrincipal:
         )
 
         self.boton_about.pack(side=tk.LEFT)
-
+        # | config |
+        self.menu_config = tk.Menu(self.barra_menu,
+                                   tearoff=0,
+                                   bg=self.color_panel,
+                                   fg=self.color_negro,
+                                   activebackground="#000080",
+                                   activeforeground="white",
+                                   relief="raised",
+                                   borderwidth=2,
+                                   font=self.fuente_Texto,
+                                   )
+        self.boton_config = tk.Button(
+            self.barra_menu,
+            text="Config",
+            font=self.fuente_Texto,
+            bg=self.color_panel,
+            fg=self.color_negro,
+            relief="flat",
+            borderwidth=0,
+            padx=8,
+            pady=3,
+            command=self.mostrar_menu_config
+        )
+        self.menu_config.add_command(label="Point Color", command=self.color_changer.abrir_venta )
+        self.boton_config.pack(side=tk.LEFT)
         ## | help |
         self.menu_help = tk.Menu(self.barra_menu,
                                  tearoff=0,
@@ -305,6 +415,9 @@ class VentanaPrincipal:
         self.entry_Y.grid(row=2, column=1, padx=10, pady=5)
         #submit
         self.submit_Coords = self.crear_boton(self.frame_Coords,"Crear punto")
+        self.submit_Coords.config(
+            command = self.crear_punto
+        )
         self.submit_Coords.grid(row=3, column=0,columnspan=2,sticky="ew", padx=10, pady=5)
     def component_reflexion(self):
         self.frame_reflexion = tk.LabelFrame(self.frame_derecho,text="Reflexion", font=self.fuente_Titulo,bg="gray94", border=1, borderwidth=2, relief="sunken", padx=10, pady=10)
