@@ -1,8 +1,10 @@
 import tkinter as tk
+import json
 from Logica.Figura import Figura
 from tkinter import ttk, colorchooser
 from PIL import Image, ImageTk
 from miscellaneous.ColorChanger import ColorChanger
+
 class VentanaPrincipal:
     def __init__(self):
        self.fuente_Titulo = ("MS Sans Serif",14, "bold")
@@ -18,18 +20,77 @@ class VentanaPrincipal:
        self.configurar_ventana()
        self.crear_componentes()
 
+    def cargar_figura(self,nombre):
+        with open("resources/figuras.json","r") as archivo:
+            datos = json.load(archivo)
+        puntos = datos ["figuras"][nombre]["puntos"]
+        self.figura.cargar_puntos(puntos)
+        self.dibujar_plano()
 
-    def dibujar_figura(self):
-        puntos = self.figura.obtener_puntos()
-        ancho = self.canvas.winfo_width()
-        alto = self.canvas.winfo_height()
+    def seleccionar_figura(self, combo, ventana):
+        figura = combo.get()
 
-        centro_x = ancho//2
-        centro_y = alto//2
+        if figura == "Triángulo":
+            self.cargar_figura("triangulo")
 
-        for i, (x,y) in enumerate(puntos):
+        elif figura == "Estrella":
+            self.cargar_figura("estrella")
+
+        elif figura == "Árbol de Navidad":
+            self.cargar_figura("arbol_navidad")
+
+    def abrir_figuras(self):
+        ventana = tk.Toplevel(self.ventana)
+        ventana.title("Paint Discreto | Add Figure")
+        ventana.resizable(False, False)
+        ventana.transient(self.ventana)
+        ventana.grab_set()
+        ventana.configure(background=self.color_panel)
+
+        titulo = tk.Label(
+            ventana,
+            text="Seleccionar figura",
+            font=("MS Sans Serif", 10, "bold"),
+            bg=self.color_panel,
+            fg=self.color_negro,
+            relief="raised",
+            borderwidth=2,
+            padx=10,
+            pady=5
+        )
+        titulo.pack(padx=10, pady=10)
+
+        combo = ttk.Combobox(
+            ventana,
+            values=[
+                "Triángulo",
+                "Estrella",
+                "Árbol de Navidad"
+            ],
+            state="readonly",
+            width=20
+        )
+
+        combo.pack(padx=15, pady=10)
+
+        boton = tk.Button(
+            ventana,
+            text="Add",
+            font=("MS Sans Serif", 9),
+            relief="raised",
+            borderwidth=2,
+            command=lambda: self.seleccionar_figura(combo, ventana)
+        )
+
+        boton.pack(pady=(5, 15))
+
+
+    def dibujar_grupo_puntos(self, grupo, centro_x, centro_y):
+
+        for i, (x, y) in enumerate(grupo):
             canvas_x = centro_x + x * self.escala
             canvas_y = centro_y - y * self.escala
+
             self.canvas.create_oval(
                 canvas_x - 4,
                 canvas_y - 4,
@@ -37,21 +98,26 @@ class VentanaPrincipal:
                 canvas_y + 4,
                 fill=self.color_changer.obtener_color()
             )
+
             self.canvas.create_text(
                 canvas_x + 10,
                 canvas_y - 10,
-                text=f"P:{i+1}",
+                text=f"P:{i + 1}",
                 font=self.fuente_Texto
             )
-        if len(puntos) >= 2:
-            for i in range(len(puntos)-1):
-                x1,y1 = puntos[i]
-                x2,y2 = puntos[i+1]
-                canvas_x1 = centro_x +x1 * self.escala
+
+        if len(grupo) >= 2:
+
+            for i in range(len(grupo) - 1):
+                x1, y1 = grupo[i]
+                x2, y2 = grupo[i + 1]
+
+                canvas_x1 = centro_x + x1 * self.escala
                 canvas_y1 = centro_y - y1 * self.escala
 
                 canvas_x2 = centro_x + x2 * self.escala
                 canvas_y2 = centro_y - y2 * self.escala
+
                 self.canvas.create_line(
                     canvas_x1,
                     canvas_y1,
@@ -61,9 +127,9 @@ class VentanaPrincipal:
                     width=2
                 )
 
-        if len(puntos) >= 3:
-            x1, y1 = puntos[-1]
-            x2, y2 = puntos[0]
+        if len(grupo) >= 3:
+            x1, y1 = grupo[-1]
+            x2, y2 = grupo[0]
 
             canvas_x1 = centro_x + x1 * self.escala
             canvas_y1 = centro_y - y1 * self.escala
@@ -79,6 +145,28 @@ class VentanaPrincipal:
                 fill="black",
                 width=2
             )
+
+
+    def dibujar_figura(self):
+        puntos = self.figura.obtener_puntos()
+        ancho = self.canvas.winfo_width()
+        alto = self.canvas.winfo_height()
+
+        centro_x = ancho//2
+        centro_y = alto//2
+        if len(puntos) > 0 and isinstance(puntos[0][0], (int, float)):
+            self.dibujar_grupo_puntos(
+                puntos,
+                centro_x,
+                centro_y
+            )
+        else:
+            for grupo in puntos:
+                self.dibujar_grupo_puntos(
+                    grupo,
+                    centro_x,
+                    centro_y
+                )
 
     def crear_punto(self):
         try:
@@ -137,6 +225,16 @@ class VentanaPrincipal:
             fill="black",
             width=2
         )
+        for x in range(-centro_x // self.escala, centro_x  // self.escala+1):
+            if x != 0  and self.escala >=20:
+                canvas_x = centro_x + x * self.escala
+                self.canvas.create_text(
+                    canvas_x,
+                    centro_y + 15,
+                    text=str(x),
+                    font=("MS Sans Serif", 5),
+                )
+
         #eje y
         self.canvas.create_line(
             centro_x,0,
@@ -144,6 +242,16 @@ class VentanaPrincipal:
             fill="black",
             width=2
         )
+        for y in range(-centro_y // self.escala, centro_y // self.escala + 1):
+            if y != 0  and self.escala >=20:
+                canvas_y = centro_y - y * self.escala
+
+                self.canvas.create_text(
+                    centro_x - 15,
+                    canvas_y,
+                    text=str(y),
+                    font=("MS Sans Serif", 5)
+                )
         #flechas
         self.canvas.create_line(
             ancho-10, centro_y,
@@ -233,6 +341,11 @@ class VentanaPrincipal:
     def mostrar_menu_help(self):
         self.menu_help.post(
             self.boton_file.winfo_rootx()+200,
+            self.boton_file.winfo_rooty()+self.boton_file.winfo_height(),
+        )
+    def mostrar_add_help(self):
+        self.menu_add.post(
+            self.boton_file.winfo_rootx()+275,
             self.boton_file.winfo_rooty()+self.boton_file.winfo_height(),
         )
     def crear_Menu(self):
@@ -335,6 +448,29 @@ class VentanaPrincipal:
         self.menu_help.add_command(label="Exit")
         self.menu_help.add_command(label="Reset")
         self.boton_help.pack(side=tk.LEFT)
+        self.menu_add = tk.Menu(self.barra_menu,
+                                 tearoff=0,
+                                 bg=self.color_panel,
+                                 fg=self.color_negro,
+                                 activebackground="#000080",
+                                 activeforeground="white",
+                                 relief="raised",
+                                 borderwidth=2,
+                                 font=self.fuente_Texto)
+        self.boton_add = tk.Button(
+            self.barra_menu,
+            text="Add",
+            font=self.fuente_Texto,
+            bg=self.color_panel,
+            fg=self.color_negro,
+            relief="flat",
+            borderwidth=0,
+            padx=8,
+            pady=3,
+            command=self.mostrar_add_help
+        )
+        self.menu_add.add_command(label="Figure",    command=self.abrir_figuras)
+        self.boton_add.pack(side=tk.LEFT)
 
         return self.barra_menu
 
@@ -357,7 +493,7 @@ class VentanaPrincipal:
                       padx=10, pady=5)
         creditos.pack(pady=5,padx=15, fill=tk.X)
         #Titulo: Nombres-----------------------------------------------------
-        autores = self.crear_label(venta_about, "Leonardo Favio Jimenez Layme (U202611731)\n\n Alex Guevara Herrera (U20261A781)\n\n Jamie Nicole Rodriguez Salcedo (U202520442)")
+        autores = self.crear_label(venta_about, "Leonardo Favio Jimenez Layme (U202611731)\n\n Alex Guevara Herrera (U20261A781)\n\n Jamie Nicole Rodriguez Salcedo (U202520442)\n\n Fabricio Jesus Villaizan Tacuche(U20251o921) ")
         autores.configure(relief="raised",fg=self.color_negro, justify="center",font=self.fuente_Texto)
         autores.pack(pady=5, padx=10)
         #Titulo: Profesor-----------------------------------------------------
