@@ -493,7 +493,7 @@ class VentanaPrincipal:
                       padx=10, pady=5)
         creditos.pack(pady=5,padx=15, fill=tk.X)
         #Titulo: Nombres-----------------------------------------------------
-        autores = self.crear_label(venta_about, "Leonardo Favio Jimenez Layme (U202611731)\n\n Alex Guevara Herrera (U20261A781)\n\n Jamie Nicole Rodriguez Salcedo (U202520442)\n\n Fabricio Jesus Villaizan Tacuche(U20251o921) ")
+        autores = self.crear_label(venta_about, "Leonardo Favio Jimenez Layme (U202611731)\n\n Alex Guevara Herrera (U20261A781)\n\n Jamie Nicole Rodriguez Salcedo (U202520442)\n\n Fabricio Jesus Villaizan Tacuche(U20251o921)\n\n Emerson Jeampierre Nolasco Ayala (U20251F206)")
         autores.configure(relief="raised",fg=self.color_negro, justify="center",font=self.fuente_Texto)
         autores.pack(pady=5, padx=10)
         #Titulo: Profesor-----------------------------------------------------
