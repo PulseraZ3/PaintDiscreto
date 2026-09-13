@@ -4,6 +4,7 @@ from Logica.Figura import Figura
 from Logica.Reflexion import Reflexion
 from tkinter import ttk, colorchooser
 from PIL import Image, ImageTk
+from pathlib import Path
 from miscellaneous.ColorChanger import ColorChanger
 
 class VentanaPrincipal:
@@ -35,7 +36,8 @@ class VentanaPrincipal:
         self.dibujar_plano()
 
     def cargar_figura(self,nombre):
-        with open("resources/figuras.json","r") as archivo:
+        ruta = Path(__file__).parent.parent / "resources" / "figuras.json"
+        with open(ruta, "r", encoding="utf-8") as archivo:
             datos = json.load(archivo)
         puntos = datos ["figuras"][nombre]["puntos"]
         self.figura.cargar_puntos(puntos)
