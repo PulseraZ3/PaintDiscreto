@@ -1,6 +1,7 @@
 import tkinter as tk
 import json
 from Logica.Figura import Figura
+from Logica.Reflexion import Reflexion
 from tkinter import ttk, colorchooser
 from PIL import Image, ImageTk
 from miscellaneous.ColorChanger import ColorChanger
@@ -14,11 +15,24 @@ class VentanaPrincipal:
        self.color_blanco="#ffffff"
        self.color_negro="#000000"
        self.escala =25        #se tendria que testear
+       self.reflexion = Reflexion()
        self.figura = Figura()
        self.ventana = tk.Tk()
        self.color_changer= ColorChanger(self)
        self.configurar_ventana()
        self.crear_componentes()
+
+    def aplicar_reflexion(self):
+        opcion = self.comboBoxReflexion.get()
+        puntos = self.figura.obtener_puntos()
+        if opcion == "Eje x":
+            nuevos_puntos = self.reflexion.reflexion_eje_x(puntos)
+        self.figura.cargar_puntos(nuevos_puntos)
+        self.dibujar_plano()
+
+    def limpiar_pantalla(self):
+        self.figura = Figura()
+        self.dibujar_plano()
 
     def cargar_figura(self,nombre):
         with open("resources/figuras.json","r") as archivo:
@@ -445,8 +459,8 @@ class VentanaPrincipal:
             pady=3,
             command=self.mostrar_menu_help
         )
-        self.menu_help.add_command(label="Exit")
-        self.menu_help.add_command(label="Reset")
+        self.menu_help.add_command(label="Exit", command=exit)
+        self.menu_help.add_command(label="Reset", command=self.limpiar_pantalla)
         self.boton_help.pack(side=tk.LEFT)
         self.menu_add = tk.Menu(self.barra_menu,
                                  tearoff=0,
@@ -569,6 +583,7 @@ class VentanaPrincipal:
         self.comboBoxReflexion.current(0)
         self.boton_Reflexion = self.crear_boton(
             self.frame_reflexion, "Aplicar reflexión")
+        self.boton_Reflexion.config(command=self.aplicar_reflexion)
         self.boton_Reflexion.grid(row=3,column=0,sticky="ew", padx=5, pady=2)
     def componente_homotecia(self):
         #contorno

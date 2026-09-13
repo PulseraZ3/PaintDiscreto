@@ -14,13 +14,25 @@ class Figura:
 
     def cantidad_puntos(self):
         return len(self.puntos)
-    def cargar_puntos(self,puntos):
-        self.puntos = []
-        for grupo in puntos:
-            figura = []
 
-            for punto in grupo:
+    def cargar_puntos(self, puntos):
+        self.puntos = []
+
+        if len(puntos) > 0 and isinstance(puntos[0][0], (int, float)):
+
+            for punto in puntos:
                 x = punto[0]
                 y = punto[1]
-                figura.append((x,y))
-            self.puntos.append(figura)
+                self.puntos.append((x, y))
+
+        else:
+
+            for grupo in puntos:
+                figura = []
+
+                for punto in grupo:
+                    x = punto[0]
+                    y = punto[1]
+                    figura.append((x, y))
+
+                self.puntos.append(figura)
