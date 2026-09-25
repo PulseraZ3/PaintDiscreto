@@ -2,6 +2,8 @@ import tkinter as tk
 import json
 from Logica.Figura import Figura
 from Logica.Reflexion import Reflexion
+from Logica.Rotacion import Rotacion
+from Logica.Homotecia import Homotecia
 from tkinter import ttk, colorchooser
 from PIL import Image, ImageTk
 from pathlib import Path
@@ -17,17 +19,52 @@ class VentanaPrincipal:
        self.color_negro="#000000"
        self.escala =25        #se tendria que testear
        self.reflexion = Reflexion()
+       self.rotacion = Rotacion()
+       self.homotecia = Homotecia()
        self.figura = Figura()
        self.ventana = tk.Tk()
        self.color_changer= ColorChanger(self)
        self.configurar_ventana()
        self.crear_componentes()
 
+    def aplicar_homotecia(self):
+
+        factor = float(self.entry_factor.get())
+
+        puntos = self.figura.obtener_puntos()
+
+        nuevos_puntos = self.homotecia.aplicar(
+            puntos,
+            factor
+        )
+
+        self.figura.cargar_puntos(nuevos_puntos)
+
+        self.dibujar_plano()
+
+    def aplicar_rotacion(self):
+        angulo = float(self.spinBox_rotacion.get())
+
+        puntos = self.figura.obtener_puntos()
+
+        nuevos_puntos = self.rotacion.rotar(
+            puntos,
+            angulo
+        )
+
+        self.figura.cargar_puntos(nuevos_puntos)
+
+        self.dibujar_plano()
     def aplicar_reflexion(self):
         opcion = self.comboBoxReflexion.get()
         puntos = self.figura.obtener_puntos()
         if opcion == "Eje x":
             nuevos_puntos = self.reflexion.reflexion_eje_x(puntos)
+        elif opcion == "Eje Y":
+            nuevos_puntos = self.reflexion.reflexion_eje_y(puntos)
+        elif opcion == "Origen":
+            nuevos_puntos = self.reflexion.reflexion_origen(puntos)
+
         self.figura.cargar_puntos(nuevos_puntos)
         self.dibujar_plano()
 
@@ -603,6 +640,7 @@ class VentanaPrincipal:
 
         self.boton_homotecia = self.crear_boton(
             self.frame_homotecia,"Aplicar")
+        self.boton_homotecia.config(command=self.aplicar_homotecia)
         self.boton_homotecia.grid(row=1,column=0,sticky="ew", padx=5, pady=2,columnspan=2)
     def componente_rotacion(self):
         self.labelFrame_rotacion = tk.LabelFrame(self.frame_derecho, text="Rotación", font=self.fuente_Titulo, bg="gray94",
@@ -619,6 +657,7 @@ class VentanaPrincipal:
         self.spinBox_rotacion.grid(row=0, column=1, padx=5, pady=5)
         self.boton_rotacion = self.crear_boton(
             self.labelFrame_rotacion, "Rotar")
+        self.boton_rotacion.config(command=self.aplicar_rotacion)
         self.boton_rotacion.grid(row=1,column=0,sticky="ew", padx=5, pady=2,columnspan=2)
     def componente_escala(self):
         self.frame_escala = tk.Frame(
