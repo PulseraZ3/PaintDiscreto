@@ -1,9 +1,11 @@
 import tkinter as tk
 import json
+import math
 from Logica.Figura import Figura
 from Logica.Reflexion import Reflexion
 from Logica.Rotacion import Rotacion
 from Logica.Homotecia import Homotecia
+from Logica.Recta import Recta
 from tkinter import ttk, colorchooser
 from PIL import Image, ImageTk
 from pathlib import Path
@@ -20,7 +22,9 @@ class VentanaPrincipal:
        self.escala =25        #se tendria que testear
        self.reflexion = Reflexion()
        self.rotacion = Rotacion()
+       self.centro_rotacion = None
        self.homotecia = Homotecia()
+       self.recta = Recta()
        self.figura = Figura()
        self.ventana = tk.Tk()
        self.color_changer= ColorChanger(self)
@@ -42,19 +46,137 @@ class VentanaPrincipal:
 
         self.dibujar_plano()
 
-    def aplicar_rotacion(self):
-        angulo = float(self.spinBox_rotacion.get())
+    def aplicar_rotacion(
+            self,
+            entry_x,
+            entry_y,
+            entry_angulo,
+            ventana
+    ):
+
+        try:
+
+            h = float(entry_x.get())
+            k = float(entry_y.get())
+            angulo = float(entry_angulo.get())
+
+        except ValueError:
+
+            print("Ingrese valores numericos")
+            return
 
         puntos = self.figura.obtener_puntos()
 
         nuevos_puntos = self.rotacion.rotar(
             puntos,
-            angulo
+            angulo,
+            h,
+            k
         )
 
         self.figura.cargar_puntos(nuevos_puntos)
 
+        self.centro_rotacion = (h, k)
+
         self.dibujar_plano()
+
+    def dibujar_trayectorias_grupo(
+            self,
+            grupo,
+            h,
+            k,
+            centro_x,
+            centro_y
+    ):
+
+        canvas_h = centro_x + h * self.escala
+        canvas_k = centro_y - k * self.escala
+
+        for x, y in grupo:
+            radio = math.sqrt(
+                (x - h) ** 2 +
+                (y - k) ** 2
+            )
+
+            radio_canvas = radio * self.escala
+
+            self.canvas.create_oval(
+                canvas_h - radio_canvas,
+                canvas_k - radio_canvas,
+                canvas_h + radio_canvas,
+                canvas_k + radio_canvas,
+                outline="red",
+                width=1
+            )
+    #dibujar la trayectoria
+    def dibujar_trayectorias(self, puntos):
+
+        if self.centro_rotacion is None:
+            return
+
+        h, k = self.centro_rotacion
+
+        ancho = self.canvas.winfo_width()
+        alto = self.canvas.winfo_height()
+
+        centro_x = ancho // 2
+        centro_y = alto // 2
+
+        if len(puntos) == 0:
+            return
+
+        if isinstance(puntos[0][0], (int, float)):
+
+            self.dibujar_trayectorias_grupo(
+                puntos,
+                h,
+                k,
+                centro_x,
+                centro_y
+            )
+
+        else:
+
+            for grupo in puntos:
+                self.dibujar_trayectorias_grupo(
+                    grupo,
+                    h,
+                    k,
+                    centro_x,
+                    centro_y
+                )
+    def dibujar_centro_rotacion(self):
+
+        if self.centro_rotacion is None:
+            return
+
+        h, k = self.centro_rotacion
+
+        ancho = self.canvas.winfo_width()
+        alto = self.canvas.winfo_height()
+
+        centro_x = ancho // 2
+        centro_y = alto // 2
+
+        canvas_x = centro_x + h * self.escala
+        canvas_y = centro_y - k * self.escala
+
+        self.canvas.create_oval(
+            canvas_x - 6,
+            canvas_y - 6,
+            canvas_x + 6,
+            canvas_y + 6,
+            fill="red",
+            outline="black"
+        )
+
+        self.canvas.create_text(
+            canvas_x + 25,
+            canvas_y - 10,
+            text=f"({h}, {k})",
+            font=("MS Sans Serif", 9)
+        )
+
     def aplicar_reflexion(self):
         opcion = self.comboBoxReflexion.get()
         puntos = self.figura.obtener_puntos()
@@ -64,12 +186,25 @@ class VentanaPrincipal:
             nuevos_puntos = self.reflexion.reflexion_eje_y(puntos)
         elif opcion == "Origen":
             nuevos_puntos = self.reflexion.reflexion_origen(puntos)
+        elif opcion == "Recta":
+            if not self.recta.existe:
+                print("Recta no existe")
+                return
+            a, b ,c = self.recta.obtener_recta()
+            print("RECTA:")
+            print("A =", a)
+            print("B =", b)
+            print("C =", c)
+
+            nuevos_puntos = self.reflexion.reflexion_recta(puntos,a,b,c)
 
         self.figura.cargar_puntos(nuevos_puntos)
         self.dibujar_plano()
 
     def limpiar_pantalla(self):
         self.figura = Figura()
+        self.recta.eliminar_recta()
+        self.centro_rotacion = None
         self.dibujar_plano()
 
     def cargar_figura(self,nombre):
@@ -91,6 +226,101 @@ class VentanaPrincipal:
 
         elif figura == "Árbol de Navidad":
             self.cargar_figura("arbol_navidad")
+
+
+    def abrir_rotacion(self):
+
+        ventana = tk.Toplevel(self.ventana)
+
+        ventana.title("Paint Discreto | Rotación")
+        ventana.resizable(False, False)
+
+        ventana.transient(self.ventana)
+        ventana.grab_set()
+
+        ventana.configure(background=self.color_panel)
+
+        titulo = tk.Label(
+            ventana,
+            text="Rotación",
+            font=("MS Sans Serif", 10, "bold"),
+            bg=self.color_panel,
+            fg=self.color_negro,
+            relief="raised",
+            borderwidth=2,
+            padx=10,
+            pady=5
+        )
+
+        titulo.pack(padx=10, pady=10)
+
+        frame = tk.Frame(
+            ventana,
+            bg=self.color_panel
+        )
+
+        frame.pack(padx=15, pady=5)
+
+        label_x = tk.Label(
+            frame,
+            text="Centro X:",
+            bg=self.color_panel
+        )
+
+        label_x.grid(row=0, column=0, padx=5, pady=5)
+
+        entry_x = tk.Entry(
+            frame,
+            width=10
+        )
+
+        entry_x.grid(row=0, column=1, padx=5, pady=5)
+
+        label_y = tk.Label(
+            frame,
+            text="Centro Y:",
+            bg=self.color_panel
+        )
+
+        label_y.grid(row=1, column=0, padx=5, pady=5)
+
+        entry_y = tk.Entry(
+            frame,
+            width=10
+        )
+
+        entry_y.grid(row=1, column=1, padx=5, pady=5)
+
+        label_angulo = tk.Label(
+            frame,
+            text="Ángulo:",
+            bg=self.color_panel
+        )
+
+        label_angulo.grid(row=2, column=0, padx=5, pady=5)
+
+        entry_angulo = tk.Entry(
+            frame,
+            width=10
+        )
+
+        entry_angulo.grid(row=2, column=1, padx=5, pady=5)
+
+        boton = tk.Button(
+            ventana,
+            text="Rotar",
+            font=("MS Sans Serif", 9),
+            relief="raised",
+            borderwidth=2,
+            command=lambda: self.aplicar_rotacion(
+                entry_x,
+                entry_y,
+                entry_angulo,
+                ventana
+            )
+        )
+
+        boton.pack(pady=(10, 15))
 
     def abrir_figuras(self):
         ventana = tk.Toplevel(self.ventana)
@@ -237,6 +467,40 @@ class VentanaPrincipal:
         self.entry_Y.delete(0, tk.END)
         self.dibujar_plano()
 
+    def dibujar_recta(self):
+
+        if not self.recta.existe:
+            return
+
+        a, b, c = self.recta.obtener_recta()
+
+        ancho = self.canvas.winfo_width()
+        alto = self.canvas.winfo_height()
+
+        centro_x = ancho // 2
+        centro_y = alto // 2
+
+        if b != 0:
+            x1 = -centro_x / self.escala
+            x2 = centro_x / self.escala
+
+            y1 = (-a * x1 - c) / b
+            y2 = (-a * x2 - c) / b
+
+            canvas_x1 = centro_x + x1 * self.escala
+            canvas_y1 = centro_y - y1 * self.escala
+
+            canvas_x2 = centro_x + x2 * self.escala
+            canvas_y2 = centro_y - y2 * self.escala
+
+            self.canvas.create_line(
+                canvas_x1,
+                canvas_y1,
+                canvas_x2,
+                canvas_y2,
+                fill="blue",
+                width=2
+            )
 
     def dibujar_plano(self,event=None):
         self.canvas.delete("all")
@@ -336,7 +600,17 @@ class VentanaPrincipal:
             text="0",
             font=self.fuente_Texto
         )
+        self.dibujar_trayectorias(
+            self.figura.obtener_puntos()
+        )
+
+        self.dibujar_recta()
+
+        self.dibujar_centro_rotacion()
+
         self.dibujar_figura()
+
+
     def mostrar_coordenadas(self,event):
         ancho = self.canvas.winfo_width()
         alto = self.canvas.winfo_height()
@@ -401,6 +675,90 @@ class VentanaPrincipal:
             self.boton_file.winfo_rootx()+275,
             self.boton_file.winfo_rooty()+self.boton_file.winfo_height(),
         )
+
+    def abrir_recta(self):
+        ventana = tk.Toplevel(self.ventana)
+
+        ventana.title("Paint Discreto | Agregar recta")
+        ventana.resizable(False, False)
+
+        ventana.transient(self.ventana)
+        ventana.grab_set()
+
+        ventana.configure(background=self.color_panel)
+
+        titulo = tk.Label(
+            ventana,
+            text="Ecuación general de la recta",
+            font=("MS Sans Serif", 10, "bold"),
+            bg=self.color_panel,
+            fg=self.color_negro,
+            relief="raised",
+            borderwidth=2,
+            padx=10,
+            pady=5
+        )
+
+        titulo.pack(padx=10, pady=10)
+
+        frame = tk.Frame(
+            ventana,
+            bg=self.color_panel
+        )
+
+        frame.pack(padx=15, pady=5)
+
+        label_a = tk.Label(
+            frame,
+            text="A:",
+            bg=self.color_panel
+        )
+
+        label_a.grid(row=0, column=0, padx=5, pady=5)
+
+        entry_a = tk.Entry(frame, width=10)
+
+        entry_a.grid(row=0, column=1, padx=5, pady=5)
+
+        label_b = tk.Label(
+            frame,
+            text="B:",
+            bg=self.color_panel
+        )
+
+        label_b.grid(row=1, column=0, padx=5, pady=5)
+
+        entry_b = tk.Entry(frame, width=10)
+
+        entry_b.grid(row=1, column=1, padx=5, pady=5)
+
+        label_c = tk.Label(
+            frame,
+            text="C:",
+            bg=self.color_panel
+        )
+
+        label_c.grid(row=2, column=0, padx=5, pady=5)
+
+        entry_c = tk.Entry(frame, width=10)
+
+        entry_c.grid(row=2, column=1, padx=5, pady=5)
+
+        boton = tk.Button(
+            ventana,
+            text="Agregar recta",
+            font=("MS Sans Serif", 9),
+            relief="raised",
+            borderwidth=2,
+            command=lambda: self.agregar_recta(
+                entry_a,
+                entry_b,
+                entry_c,
+                ventana
+            )
+        )
+
+        boton.pack(pady=(10, 15))
     def crear_Menu(self):
         ##refactorizar xd
         self.barra_menu = tk.Frame(self.ventana,
@@ -523,10 +881,27 @@ class VentanaPrincipal:
             command=self.mostrar_add_help
         )
         self.menu_add.add_command(label="Figure",    command=self.abrir_figuras)
+        self.menu_add.add_command(label="Line",    command=self.abrir_recta)
+        self.menu_add.add_command(label="Rotacion",    command=self.abrir_rotacion)
         self.boton_add.pack(side=tk.LEFT)
 
         return self.barra_menu
 
+    def agregar_recta(self, entry_a, entry_b, entry_c, ventana):
+        try:
+            a = float(entry_a.get())
+            b = float(entry_b.get())
+            c = float(entry_c.get())
+        except ValueError:
+            print("Ingrese valores numericos")
+            return
+        if a == 0 and b == 0:
+            print("La recta no es valida")
+            return
+        self.recta.establecer_recta(a, b, c)
+        ventana.destroy()
+
+        self.dibujar_plano()
     def abrir_about(self):
         venta_about = tk.Toplevel(self.ventana)
         #ventana-----------------------------------------------------
@@ -616,7 +991,7 @@ class VentanaPrincipal:
         estilo = ttk.Style()
         estilo.configure("Reflexion.TComboBox", font=("MS Sans Serif", 11),padding=5)
         ##Buttons
-        self.comboBoxReflexion = ttk.Combobox(self.frame_reflexion, values=["Eje x","Eje Y","Origen"],
+        self.comboBoxReflexion = ttk.Combobox(self.frame_reflexion, values=["Eje x","Eje Y","Origen","Recta"],
                                               state="readonly",style="Reflexion.TCombobox", font=self.fuente_Texto)
         self.comboBoxReflexion.grid(row=1, column = 0, columnspan=2, sticky="ew", padx=5, pady=5)
         self.comboBoxReflexion.current(0)
