@@ -54,3 +54,21 @@ class Rotacion:
                 nuevo_puntos.append(nuevo_grupo)
 
         return nuevo_puntos
+
+    def copiar_puntos(self, puntos):
+        copia = []
+        if len(puntos) ==0:
+            return copia
+        if isinstance(puntos[0][0], (int, float)):
+            for x, y in puntos:
+                copia.append((x, y))
+        else:
+            for grupo in puntos:
+                nuevo_grupo = []
+
+                for x, y in grupo:
+                    nuevo_grupo.append((x, y))
+
+                copia.append(nuevo_grupo)
+
+        return copia

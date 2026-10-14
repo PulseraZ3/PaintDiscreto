@@ -1,12 +1,15 @@
 import tkinter as tk
 import json
+import csv
 import math
+import sys
+import copy
 from Logica.Figura import Figura
 from Logica.Reflexion import Reflexion
 from Logica.Rotacion import Rotacion
 from Logica.Homotecia import Homotecia
 from Logica.Recta import Recta
-from tkinter import ttk, colorchooser
+from tkinter import ttk, colorchooser,filedialog, messagebox, simpledialog
 from PIL import Image, ImageTk
 from pathlib import Path
 from miscellaneous.ColorChanger import ColorChanger
@@ -20,6 +23,15 @@ class VentanaPrincipal:
        self.color_blanco="#ffffff"
        self.color_negro="#000000"
        self.escala =25        #se tendria que testear
+       self.puntos_originales = None
+       self.tipo_operacion = None
+       self.animando = False
+       self.animacion_id = None
+       self.centro_homotecia = None
+       self.offset_x = 0
+       self.offset_y = 0
+       self.arrastre = None
+       self.mostrar_circulos_rotacion = True
        self.reflexion = Reflexion()
        self.rotacion = Rotacion()
        self.centro_rotacion = None
@@ -27,24 +39,468 @@ class VentanaPrincipal:
        self.recta = Recta()
        self.figura = Figura()
        self.ventana = tk.Tk()
+       self.var_circulos_rotacion = tk.BooleanVar(value=True)
        self.color_changer= ColorChanger(self)
        self.configurar_ventana()
        self.crear_componentes()
 
-    def aplicar_homotecia(self):
 
-        factor = float(self.entry_factor.get())
+    #Abrir archivos externos
+    def actualizar_circulos_rotacion(self):
+        self.mostrar_circulos_rotacion = self.var_circulos_rotacion.get()
+        self.dibujar_plano()
+    def abrir_archivo_externo(self):
+        ruta = filedialog.askopenfilename(
+            title="Seleccionar figura",
+            filetypes=[
+                ("Archivos compatibles", "*.csv *.txt *.json"),
+                ("Archivos CSV", "*.csv"),
+                ("Archivos TXT", "*.txt"),
+                ("Archivos JSON", "*.json")
+            ]
+        )
+        if ruta:
+            try:
+                if ruta.endswith(".csv"):
+                    puntos = self.leer_csv(ruta)
 
-        puntos = self.figura.obtener_puntos()
+                elif ruta.endswith(".txt"):
+                    puntos = self.leer_txt(ruta)
 
-        nuevos_puntos = self.homotecia.aplicar(
-            puntos,
-            factor
+                elif ruta.endswith(".json"):
+                    puntos = self.leer_json_externo(ruta)
+
+                else:
+                    messagebox.showerror(
+                        "Error", "Formato no compatible"
+                    )
+                    return
+
+                if not puntos:
+                    messagebox.showerror(
+                        "Error", "El archivo no contiene puntos"
+                    )
+                    return
+
+                self.figura.cargar_puntos(puntos)
+                self.puntos_originales = None
+                self.centro_rotacion = None
+                self.dibujar_plano()
+
+            except (ValueError, OSError, json.JSONDecodeError) as error:
+                messagebox.showerror(
+                    "Error al leer el archivo", str(error)
+                )
+
+    def leer_csv(self, ruta):
+        puntos = []
+
+        with open(ruta, "r", newline="", encoding="utf-8-sig") as archivo:
+            lector = csv.reader(archivo)
+
+            for fila in lector:
+                if len(fila) < 2:
+                    continue
+
+                try:
+                    x = float(fila[0].strip())
+                    y = float(fila[1].strip())
+                    puntos.append((x, y))
+                except ValueError:
+                    continue
+
+        return puntos
+
+    def leer_txt(self, ruta):
+        puntos = []
+
+        with open(ruta, "r", encoding="utf-8-sig") as archivo:
+            for linea in archivo:
+                linea = linea.strip()
+
+                if not linea or linea.startswith("#"):
+                    continue
+
+                linea = linea.replace(",", " ")
+                coordenadas = linea.split()
+
+                if len(coordenadas) != 2:
+                    continue
+
+                try:
+                    x = float(coordenadas[0])
+                    y = float(coordenadas[1])
+                    puntos.append((x, y))
+                except ValueError:
+                    continue
+
+        return puntos
+
+    def leer_json_externo(self, ruta):
+        with open(ruta, "r", encoding="utf-8-sig") as archivo:
+            datos = json.load(archivo)
+
+        if "figuras" in datos:
+            figuras = datos["figuras"]
+
+            if not figuras:
+                return []
+
+            nombres = list(figuras.keys())
+
+            if len(nombres) == 1:
+                nombre = nombres[0]
+            else:
+                nombre = simpledialog.askstring(
+                    "Seleccionar figura",
+                    "Figuras disponibles:\n"
+                    + "\n".join(nombres)
+                    + "\n\nEscribe el nombre de la figura:"
+                )
+
+                if nombre is None:
+                    return []
+
+                if nombre not in figuras:
+                    raise ValueError("El nombre de la figura no existe")
+
+            puntos = figuras[nombre]["puntos"]
+
+        else:
+            puntos = datos["puntos"]
+
+        return puntos
+    # desplazamiento con el mouse
+    def obtener_centro(self):
+        centro_x = self.canvas.winfo_width() // 2 + self.offset_x
+        centro_y = self.canvas.winfo_height() // 2 + self.offset_y
+        return centro_x, centro_y
+
+    def iniciar_arrastre(self, event):
+        self.arrastre = (event.x, event.y, self.offset_x, self.offset_y)
+        self.canvas.config(cursor="fleur")
+
+    def arrastrar_plano(self, event):
+        if self.arrastre is None:
+            return
+        inicio_x, inicio_y, offset_x, offset_y = self.arrastre
+        self.offset_x = offset_x + (event.x - inicio_x)
+        self.offset_y = offset_y + (event.y - inicio_y)
+        self.dibujar_plano()
+        self.mostrar_coordenadas(event)
+
+    def terminar_arrastre(self, event):
+        self.arrastre = None
+        self.canvas.config(cursor="")
+
+    def centrar_vista(self, event=None):
+        self.offset_x = 0
+        self.offset_y = 0
+        self.dibujar_plano()
+
+    # figura antes de cada operación
+    def guardar_referencia(self, puntos, tipo):
+        if tipo == self.tipo_operacion and self.puntos_originales is not None:
+            return
+
+        self.tipo_operacion = tipo
+
+        if puntos is None or len(puntos) == 0:
+            self.puntos_originales = None
+            return
+
+        self.puntos_originales = copy.deepcopy(puntos)
+
+    def reiniciar_referencia(self):
+        self.puntos_originales = None
+        self.tipo_operacion = None
+
+    def cancelar_animacion(self):
+        if self.animacion_id is not None:
+            self.ventana.after_cancel(self.animacion_id)
+        self.animacion_id = None
+        self.animando = False
+
+    def animar_rotacion(self, puntos_base, angulo, h, k):
+        pasos = max(1, min(60, int(abs(angulo) // 3) + 1))
+        self.animando = True
+        self.paso_animacion(puntos_base, angulo, h, k, 1, pasos)
+
+    def paso_animacion(self, puntos_base, angulo, h, k, paso, pasos):
+        if paso >= pasos:
+            angulo_parcial = angulo          # último paso: ángulo exacto
+        else:
+            angulo_parcial = angulo * paso / pasos
+
+        nuevos_puntos = self.rotacion.rotar(
+            copy.deepcopy(puntos_base),
+            angulo_parcial,
+            h,
+            k
         )
 
         self.figura.cargar_puntos(nuevos_puntos)
-
         self.dibujar_plano()
+
+        if paso < pasos:
+            self.animacion_id = self.ventana.after(
+                15,
+                lambda: self.paso_animacion(
+                    puntos_base, angulo, h, k, paso + 1, pasos
+                )
+            )
+        else:
+            self.animando = False
+            self.animacion_id = None
+
+    def animar_homotecia(self, puntos_base, factor, h, k):
+        pasos = 30
+        self.animando = True
+        self.paso_animacion_homotecia(puntos_base, factor, h, k, 1, pasos)
+
+    def paso_animacion_homotecia(self, puntos_base, factor, h, k, paso, pasos):
+        if paso >= pasos:
+            factor_parcial = factor
+        else:
+            factor_parcial = 1 + (factor - 1) * paso / pasos
+
+        nuevos_puntos = self.homotecia.aplicar_con_centro(
+            copy.deepcopy(puntos_base),
+            factor_parcial,
+            h,
+            k
+        )
+
+        self.figura.cargar_puntos(nuevos_puntos)
+        self.dibujar_plano()
+
+        if paso < pasos:
+            self.animacion_id = self.ventana.after(
+                20,
+                lambda: self.paso_animacion_homotecia(
+                    puntos_base, factor, h, k, paso + 1, pasos
+                )
+            )
+        else:
+            self.animando = False
+            self.animacion_id = None
+
+    def aplanar_puntos(self, puntos):
+        if puntos is None or len(puntos) == 0:
+            return []
+        if isinstance(puntos[0][0], (int, float)):
+            return list(puntos)
+        resultado = []
+        for grupo in puntos:
+            resultado.extend(grupo)
+        return resultado
+
+    def dibujar_fuga(self):
+
+        if self.centro_homotecia is None or self.puntos_originales is None:
+            return
+        if not (self.tipo_operacion or "").startswith("homotecia"):
+            return
+
+        h, k = self.centro_homotecia
+
+        centro_x, centro_y = self.obtener_centro()
+
+        canvas_h = centro_x + h * self.escala
+        canvas_k = centro_y - k * self.escala
+
+        referencia = self.aplanar_puntos(self.puntos_originales)
+        actuales = self.aplanar_puntos(self.figura.obtener_puntos())
+
+        for (x1, y1), (x2, y2) in zip(referencia, actuales):
+            for (x, y) in ((x1, y1), (x2, y2)):
+                self.canvas.create_line(
+                    canvas_h,
+                    canvas_k,
+                    centro_x + x * self.escala,
+                    centro_y - y * self.escala,
+                    fill="green",
+                    dash=(4, 3),
+                    width=1
+                )
+        self.canvas.create_oval(
+            canvas_h - 6,
+            canvas_k - 6,
+            canvas_h + 6,
+            canvas_k + 6,
+            fill="green",
+            outline="black"
+        )
+
+        self.canvas.create_text(
+            canvas_h + 30,
+            canvas_k + 14,
+            text=f"C({h:g}, {k:g})",
+            fill="green",
+            font=("MS Sans Serif", 9, "bold")
+        )
+
+    def dibujar_puntos(self, puntos, color_puntos=None,
+                       color_lineas="black", color_texto="black"):
+        # Dibuja una figura (lista plana o grupos) reutilizando dibujar_grupo_puntos.
+        if puntos is None or len(puntos) == 0:
+            return
+
+        centro_x, centro_y = self.obtener_centro()
+
+        if isinstance(puntos[0][0], (int, float)):
+            self.dibujar_grupo_puntos(
+                puntos, centro_x, centro_y,
+                color_puntos, color_lineas, color_texto
+            )
+        else:
+            for grupo in puntos:
+                self.dibujar_grupo_puntos(
+                    grupo, centro_x, centro_y,
+                    color_puntos, color_lineas, color_texto
+                )
+
+    def dibujar_figura_original(self):
+        self.dibujar_puntos(
+            self.puntos_originales,
+            color_puntos="blue",
+            color_lineas="blue",
+            color_texto="blue"
+        )
+
+    def aplicar_homotecia(self):
+        try:
+            factor = float(self.entry_factor.get())
+        except ValueError:
+            print("Ingrese valores numericos")
+            return
+
+        if self.centro_homotecia is None:
+            h, k = 0.0, 0.0
+        else:
+            h, k = self.centro_homotecia
+
+        self.ejecutar_homotecia(factor, h, k)
+
+    def aplicar_homotecia_centro(self, entry_x, entry_y, entry_factor, ventana):
+        #
+        try:
+            h = float(entry_x.get())
+            k = float(entry_y.get())
+            factor = float(entry_factor.get())
+        except ValueError:
+            print("Ingrese valores numericos")
+            return
+
+        self.ejecutar_homotecia(factor, h, k)
+
+    def ejecutar_homotecia(self, factor, h, k):
+        if self.animando:
+            return
+
+        puntos = self.figura.obtener_puntos()
+        self.guardar_referencia(puntos, f"homotecia {h} {k}")
+
+        self.centro_homotecia = (h, k)
+
+        self.animar_homotecia(copy.deepcopy(puntos), factor, h, k)
+
+    def abrir_homotecia(self):
+
+        ventana = tk.Toplevel(self.ventana)
+
+        ventana.title("Paint Discreto | Homotecia")
+        ventana.resizable(False, False)
+
+        ventana.transient(self.ventana)
+        ventana.grab_set()
+
+        ventana.configure(background=self.color_panel)
+
+        titulo = tk.Label(
+            ventana,
+            text="Homotecia",
+            font=("MS Sans Serif", 10, "bold"),
+            bg=self.color_panel,
+            fg=self.color_negro,
+            relief="raised",
+            borderwidth=2,
+            padx=10,
+            pady=5
+        )
+
+        titulo.pack(padx=10, pady=10)
+
+        frame = tk.Frame(
+            ventana,
+            bg=self.color_panel
+        )
+
+        frame.pack(padx=15, pady=5)
+
+        label_x = tk.Label(
+            frame,
+            text="Centro X:",
+            bg=self.color_panel
+        )
+
+        label_x.grid(row=0, column=0, padx=5, pady=5)
+
+        entry_x = tk.Entry(
+            frame,
+            width=10
+        )
+        entry_x.insert(0, "0")
+
+        entry_x.grid(row=0, column=1, padx=5, pady=5)
+
+        label_y = tk.Label(
+            frame,
+            text="Centro Y:",
+            bg=self.color_panel
+        )
+
+        label_y.grid(row=1, column=0, padx=5, pady=5)
+
+        entry_y = tk.Entry(
+            frame,
+            width=10
+        )
+        entry_y.insert(0, "0")
+
+        entry_y.grid(row=1, column=1, padx=5, pady=5)
+
+        label_factor = tk.Label(
+            frame,
+            text="Factor:",
+            bg=self.color_panel
+        )
+
+        label_factor.grid(row=2, column=0, padx=5, pady=5)
+
+        entry_factor = tk.Entry(
+            frame,
+            width=10
+        )
+        entry_factor.insert(0, "2")
+
+        entry_factor.grid(row=2, column=1, padx=5, pady=5)
+
+        boton = tk.Button(
+            ventana,
+            text="Aplicar",
+            font=("MS Sans Serif", 9),
+            relief="raised",
+            borderwidth=2,
+            command=lambda: self.aplicar_homotecia_centro(
+                entry_x,
+                entry_y,
+                entry_factor,
+                ventana
+            )
+        )
+
+        boton.pack(pady=(10, 15))
 
     def aplicar_rotacion(
             self,
@@ -53,7 +509,6 @@ class VentanaPrincipal:
             entry_angulo,
             ventana
     ):
-
         try:
 
             h = float(entry_x.get())
@@ -65,20 +520,16 @@ class VentanaPrincipal:
             print("Ingrese valores numericos")
             return
 
+        if self.animando:
+            return
+
         puntos = self.figura.obtener_puntos()
 
-        nuevos_puntos = self.rotacion.rotar(
-            puntos,
-            angulo,
-            h,
-            k
-        )
-
-        self.figura.cargar_puntos(nuevos_puntos)
+        self.guardar_referencia(puntos, "rotacion")
 
         self.centro_rotacion = (h, k)
 
-        self.dibujar_plano()
+        self.animar_rotacion(copy.deepcopy(puntos), angulo, h, k)
 
     def dibujar_trayectorias_grupo(
             self,
@@ -99,15 +550,15 @@ class VentanaPrincipal:
             )
 
             radio_canvas = radio * self.escala
-
-            self.canvas.create_oval(
-                canvas_h - radio_canvas,
-                canvas_k - radio_canvas,
-                canvas_h + radio_canvas,
-                canvas_k + radio_canvas,
-                outline="red",
-                width=1
-            )
+            if self.mostrar_circulos_rotacion:
+                self.canvas.create_oval(
+                    canvas_h - radio_canvas,
+                    canvas_k - radio_canvas,
+                    canvas_h + radio_canvas,
+                    canvas_k + radio_canvas,
+                    outline="red",
+                    width=1
+                )
     #dibujar la trayectoria
     def dibujar_trayectorias(self, puntos):
 
@@ -119,8 +570,7 @@ class VentanaPrincipal:
         ancho = self.canvas.winfo_width()
         alto = self.canvas.winfo_height()
 
-        centro_x = ancho // 2
-        centro_y = alto // 2
+        centro_x, centro_y = self.obtener_centro()
 
         if len(puntos) == 0:
             return
@@ -155,12 +605,10 @@ class VentanaPrincipal:
         ancho = self.canvas.winfo_width()
         alto = self.canvas.winfo_height()
 
-        centro_x = ancho // 2
-        centro_y = alto // 2
+        centro_x, centro_y = self.obtener_centro()
 
         canvas_x = centro_x + h * self.escala
         canvas_y = centro_y - k * self.escala
-
         self.canvas.create_oval(
             canvas_x - 6,
             canvas_y - 6,
@@ -178,25 +626,35 @@ class VentanaPrincipal:
         )
 
     def aplicar_reflexion(self):
+        if self.animando:
+            return
+
         opcion = self.comboBoxReflexion.get()
         puntos = self.figura.obtener_puntos()
+
+        if opcion not in ("Eje x", "Eje Y", "Origen", "Recta"):
+            return
+
+        if opcion == "Recta" and not self.recta.existe:
+            print("Recta no existe")
+            return
+
+        self.guardar_referencia(puntos, "reflexion " + opcion)
+
         if opcion == "Eje x":
             nuevos_puntos = self.reflexion.reflexion_eje_x(puntos)
         elif opcion == "Eje Y":
             nuevos_puntos = self.reflexion.reflexion_eje_y(puntos)
         elif opcion == "Origen":
             nuevos_puntos = self.reflexion.reflexion_origen(puntos)
-        elif opcion == "Recta":
-            if not self.recta.existe:
-                print("Recta no existe")
-                return
-            a, b ,c = self.recta.obtener_recta()
+        else:  # Recta
+            a, b, c = self.recta.obtener_recta()
             print("RECTA:")
             print("A =", a)
             print("B =", b)
             print("C =", c)
 
-            nuevos_puntos = self.reflexion.reflexion_recta(puntos,a,b,c)
+            nuevos_puntos = self.reflexion.reflexion_recta(puntos, a, b, c)
 
         self.figura.cargar_puntos(nuevos_puntos)
         self.dibujar_plano()
@@ -205,15 +663,49 @@ class VentanaPrincipal:
         self.figura = Figura()
         self.recta.eliminar_recta()
         self.centro_rotacion = None
+        self.centro_homotecia = None
+        self.offset_x = 0
+        self.offset_y = 0
+        self.cancelar_animacion()
+        self.reiniciar_referencia()
         self.dibujar_plano()
 
-    def cargar_figura(self,nombre):
-        ruta = Path(__file__).parent.parent / "resources" / "figuras.json"
-        with open(ruta, "r", encoding="utf-8") as archivo:
-            datos = json.load(archivo)
-        puntos = datos ["figuras"][nombre]["puntos"]
-        self.figura.cargar_puntos(puntos)
-        self.dibujar_plano()
+    def cargar_figura(self, nombre):
+        if getattr(sys, "frozen", False):
+            # Ruta donde PyInstaller extrae los recursos del EXE
+            carpeta_base = Path(sys._MEIPASS)
+        else:
+            # Ruta del proyecto cuando ejecutas Python
+            carpeta_base = Path(__file__).resolve().parent.parent
+
+        ruta = carpeta_base / "resources" / "figuras.json"
+
+        try:
+            with open(ruta, "r", encoding="utf-8") as archivo:
+                datos = json.load(archivo)
+
+            puntos = datos["figuras"][nombre]["puntos"]
+
+            self.cancelar_animacion()
+            self.centro_homotecia = None
+            self.reiniciar_referencia()
+            self.figura.cargar_puntos(puntos)
+            self.dibujar_plano()
+
+        except (OSError, json.JSONDecodeError, KeyError) as error:
+            messagebox.showerror(
+                "Error al cargar figura",
+                f"No se pudo cargar '{nombre}'.\n\n"
+                f"Detalle: {error}\n\n"
+                f"Ruta buscada: {ruta}"
+            )
+
+        except (OSError, json.JSONDecodeError, KeyError) as error:
+            messagebox.showerror(
+                "Error al cargar figura",
+                f"No se pudo cargar la figura '{nombre}'.\n{error}\n\n"
+                f"Ruta utilizada: {ruta}"
+            )
 
     def seleccionar_figura(self, combo, ventana):
         figura = combo.get()
@@ -305,7 +797,22 @@ class VentanaPrincipal:
         )
 
         entry_angulo.grid(row=2, column=1, padx=5, pady=5)
+        casilla_circulos = tk.Checkbutton(
+            frame,
+            text="Mostrar círculos de rotación",
+            variable=self.var_circulos_rotacion,
+            command=self.actualizar_circulos_rotacion,
+            bg=self.color_panel,
+            activebackground=self.color_panel
+        )
 
+        casilla_circulos.grid(
+            row=3,
+            column=0,
+            columnspan=2,
+            padx=5,
+            pady=5
+        )
         boton = tk.Button(
             ventana,
             text="Rotar",
@@ -324,7 +831,7 @@ class VentanaPrincipal:
 
     def abrir_figuras(self):
         ventana = tk.Toplevel(self.ventana)
-        ventana.title("Paint Discreto | Add Figure")
+        ventana.title("Paint Discreto | Agregar Figura")
         ventana.resizable(False, False)
         ventana.transient(self.ventana)
         ventana.grab_set()
@@ -368,24 +875,30 @@ class VentanaPrincipal:
         boton.pack(pady=(5, 15))
 
 
-    def dibujar_grupo_puntos(self, grupo, centro_x, centro_y):
+    def dibujar_grupo_puntos(self, grupo, centro_x, centro_y,
+                             color_puntos=None, color_lineas="black",
+                             color_texto="black"):
+
+        if color_puntos is None:
+            color_puntos = self.color_changer.obtener_color()
 
         for i, (x, y) in enumerate(grupo):
             canvas_x = centro_x + x * self.escala
             canvas_y = centro_y - y * self.escala
-
-            self.canvas.create_oval(
-                canvas_x - 4,
-                canvas_y - 4,
-                canvas_x + 4,
-                canvas_y + 4,
-                fill=self.color_changer.obtener_color()
-            )
+            if self.mostrar_circulos_rotacion:
+                self.canvas.create_oval(
+                    canvas_x - 4,
+                    canvas_y - 4,
+                    canvas_x + 4,
+                    canvas_y + 4,
+                    fill=color_puntos
+                )
 
             self.canvas.create_text(
                 canvas_x + 10,
                 canvas_y - 10,
                 text=f"P:{i + 1}",
+                fill=color_texto,
                 font=self.fuente_Texto
             )
 
@@ -406,7 +919,7 @@ class VentanaPrincipal:
                     canvas_y1,
                     canvas_x2,
                     canvas_y2,
-                    fill="black",
+                    fill=color_lineas,
                     width=2
                 )
 
@@ -425,33 +938,17 @@ class VentanaPrincipal:
                 canvas_y1,
                 canvas_x2,
                 canvas_y2,
-                fill="black",
+                fill=color_lineas,
                 width=2
             )
 
 
     def dibujar_figura(self):
-        puntos = self.figura.obtener_puntos()
-        ancho = self.canvas.winfo_width()
-        alto = self.canvas.winfo_height()
-
-        centro_x = ancho//2
-        centro_y = alto//2
-        if len(puntos) > 0 and isinstance(puntos[0][0], (int, float)):
-            self.dibujar_grupo_puntos(
-                puntos,
-                centro_x,
-                centro_y
-            )
-        else:
-            for grupo in puntos:
-                self.dibujar_grupo_puntos(
-                    grupo,
-                    centro_x,
-                    centro_y
-                )
+        self.dibujar_puntos(self.figura.obtener_puntos())
 
     def crear_punto(self):
+        if self.animando:
+            return
         try:
             x = float(self.entry_X.get())
             y = float(self.entry_Y.get())
@@ -463,6 +960,7 @@ class VentanaPrincipal:
             print("Ya existen 4 puntos")
             return
         print("punto agregado: ",x,y)
+        self.reiniciar_referencia()
         self.entry_X.delete(0, tk.END)
         self.entry_Y.delete(0, tk.END)
         self.dibujar_plano()
@@ -477,12 +975,12 @@ class VentanaPrincipal:
         ancho = self.canvas.winfo_width()
         alto = self.canvas.winfo_height()
 
-        centro_x = ancho // 2
-        centro_y = alto // 2
+        centro_x, centro_y = self.obtener_centro()
 
         if b != 0:
-            x1 = -centro_x / self.escala
-            x2 = centro_x / self.escala
+
+            x1 = (0 - centro_x) / self.escala
+            x2 = (ancho - centro_x) / self.escala
 
             y1 = (-a * x1 - c) / b
             y2 = (-a * x2 - c) / b
@@ -502,12 +1000,26 @@ class VentanaPrincipal:
                 width=2
             )
 
+        else:
+
+            x = -c / a
+
+            canvas_x = centro_x + x * self.escala
+
+            self.canvas.create_line(
+                canvas_x,
+                0,
+                canvas_x,
+                alto,
+                fill="blue",
+                width=2
+            )
+
     def dibujar_plano(self,event=None):
         self.canvas.delete("all")
         ancho = self.canvas.winfo_width()
         alto = self.canvas.winfo_height()
-        centro_x = ancho //2
-        centro_y = alto //2
+        centro_x, centro_y = self.obtener_centro()
 
         #
         for x in range(centro_x, ancho, self.escala):
@@ -542,12 +1054,14 @@ class VentanaPrincipal:
             fill="black",
             width=2
         )
-        for x in range(-centro_x // self.escala, centro_x  // self.escala+1):
+        marca_y = min(max(centro_y + 15, 10), alto - 10)
+        for x in range(math.floor((0 - centro_x) / self.escala),
+                       math.ceil((ancho - centro_x) / self.escala) + 1):
             if x != 0  and self.escala >=20:
                 canvas_x = centro_x + x * self.escala
                 self.canvas.create_text(
                     canvas_x,
-                    centro_y + 15,
+                    marca_y,
                     text=str(x),
                     font=("MS Sans Serif", 5),
                 )
@@ -559,12 +1073,14 @@ class VentanaPrincipal:
             fill="black",
             width=2
         )
-        for y in range(-centro_y // self.escala, centro_y // self.escala + 1):
+        marca_x = min(max(centro_x - 15, 15), ancho - 15)
+        for y in range(math.floor((centro_y - alto) / self.escala),
+                       math.ceil(centro_y / self.escala) + 1):
             if y != 0  and self.escala >=20:
                 canvas_y = centro_y - y * self.escala
 
                 self.canvas.create_text(
-                    centro_x - 15,
+                    marca_x,
                     canvas_y,
                     text=str(y),
                     font=("MS Sans Serif", 5)
@@ -606,16 +1122,17 @@ class VentanaPrincipal:
 
         self.dibujar_recta()
 
+        self.dibujar_figura_original()
+
+        self.dibujar_fuga()
+
         self.dibujar_centro_rotacion()
 
         self.dibujar_figura()
 
 
     def mostrar_coordenadas(self,event):
-        ancho = self.canvas.winfo_width()
-        alto = self.canvas.winfo_height()
-        centro_x=ancho//2
-        centro_y=alto//2
+        centro_x, centro_y = self.obtener_centro()
         x = round((event.x -centro_x)/self.escala)
         y = round((centro_y-event.y)/self.escala)
         self.label_coordenadas.config(
@@ -777,9 +1294,7 @@ class VentanaPrincipal:
                                  borderwidth=2,
                                  font=self.fuente_Texto)
 
-        self.menu_file.add_command(label="Open .csv")
-        self.menu_file.add_command(label="Open .xlsx")
-        self.menu_file.add_command(label="Open .txt")
+        self.menu_file.add_command(label="Open File", command=self.abrir_archivo_externo)
         self.boton_file = tk.Button(
             self.barra_menu,
             text="File",
@@ -856,8 +1371,9 @@ class VentanaPrincipal:
             pady=3,
             command=self.mostrar_menu_help
         )
-        self.menu_help.add_command(label="Exit", command=exit)
+        self.menu_help.add_command(label="Exit", command=self.ventana.destroy)
         self.menu_help.add_command(label="Reset", command=self.limpiar_pantalla)
+        self.menu_help.add_command(label="Center view", command=self.centrar_vista)
         self.boton_help.pack(side=tk.LEFT)
         self.menu_add = tk.Menu(self.barra_menu,
                                  tearoff=0,
@@ -880,9 +1396,10 @@ class VentanaPrincipal:
             pady=3,
             command=self.mostrar_add_help
         )
-        self.menu_add.add_command(label="Figure",    command=self.abrir_figuras)
-        self.menu_add.add_command(label="Line",    command=self.abrir_recta)
+        self.menu_add.add_command(label="Figura",    command=self.abrir_figuras)
+        self.menu_add.add_command(label="Linea",    command=self.abrir_recta)
         self.menu_add.add_command(label="Rotacion",    command=self.abrir_rotacion)
+        self.menu_add.add_command(label="Homotecia",    command=self.abrir_homotecia)
         self.boton_add.pack(side=tk.LEFT)
 
         return self.barra_menu
@@ -1017,23 +1534,49 @@ class VentanaPrincipal:
             self.frame_homotecia,"Aplicar")
         self.boton_homotecia.config(command=self.aplicar_homotecia)
         self.boton_homotecia.grid(row=1,column=0,sticky="ew", padx=5, pady=2,columnspan=2)
+
     def componente_rotacion(self):
-        self.labelFrame_rotacion = tk.LabelFrame(self.frame_derecho, text="Rotación", font=self.fuente_Titulo, bg="gray94",
-                                             border=1, borderwidth=2, relief="sunken",
-                                             padx=10, pady=10)
+        self.labelFrame_rotacion = tk.LabelFrame(self.frame_derecho, text="Rotación", font=self.fuente_Titulo,
+                                                 bg="gray94",
+                                                 border=1, borderwidth=2, relief="sunken",
+                                                 padx=10, pady=10)
         self.labelFrame_rotacion.pack(fill=tk.X, pady=5, padx=5)
         self.labelFrame_rotacion.columnconfigure(1, weight=1)
-        self.label_rotacion = tk.Label(self.labelFrame_rotacion, text="Ángulo de rotación",font=self.fuente_Texto,bg="gray94",fg="black",
+        self.label_rotacion = tk.Label(self.labelFrame_rotacion, text="Ángulo de rotación", font=self.fuente_Texto,
+                                       bg="gray94", fg="black",
                                        padx=10, pady=10)
         self.label_rotacion.grid(row=0, column=0, padx=5, pady=5)
-        self.spinBox_rotacion = tk.Spinbox(self.labelFrame_rotacion, from_=-360, to=360,increment=1,font=self.fuente_Texto,bg="white",width=10)
-        self.spinBox_rotacion.delete(0,tk.END)
-        self.spinBox_rotacion.insert(0,"0")
+        self.spinBox_rotacion = tk.Spinbox(self.labelFrame_rotacion, from_=-360, to=360, increment=1,
+                                           font=self.fuente_Texto, bg="white", width=10)
+        self.spinBox_rotacion.delete(0, tk.END)
+        self.spinBox_rotacion.insert(0, "0")
         self.spinBox_rotacion.grid(row=0, column=1, padx=5, pady=5)
         self.boton_rotacion = self.crear_boton(
             self.labelFrame_rotacion, "Rotar")
-        self.boton_rotacion.config(command=self.aplicar_rotacion)
-        self.boton_rotacion.grid(row=1,column=0,sticky="ew", padx=5, pady=2,columnspan=2)
+        self.boton_rotacion.config(command=self.aplicar_rotacion_origen)
+        self.boton_rotacion.grid(row=1, column=0, sticky="ew", padx=5, pady=2, columnspan=2)
+
+    def aplicar_rotacion_origen(self):
+        try:
+            angulo = float(self.spinBox_rotacion.get())
+        except ValueError:
+            print("Ingrese un ángulo numérico")
+            return
+
+        if self.animando:
+            return
+
+        puntos = self.figura.obtener_puntos()
+
+        self.guardar_referencia(puntos, "rotacion")
+        self.centro_rotacion = (0, 0)
+
+        self.animar_rotacion(
+            copy.deepcopy(puntos),
+            angulo,
+            0,
+            0
+        )
     def componente_escala(self):
         self.frame_escala = tk.Frame(
             self.frame_derecho,
@@ -1070,13 +1613,16 @@ class VentanaPrincipal:
         # Frame izquierdo
         self.frame_izquierdo = tk.Frame(self.ventana, bg="gray94")
         self.frame_izquierdo.pack(side=tk.LEFT, fill=tk.BOTH, pady=10, padx=10, expand=True)
-        # Canvas / plano cartesiano
         self.canvas = tk.Canvas(
             self.frame_izquierdo,
             bg="white", relief="sunken",borderwidth=2,highlightthickness=2,highlightcolor="black")
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.canvas.bind("<Configure>",self.dibujar_plano)
         self.canvas.bind("<Motion>",self.mostrar_coordenadas)
+        self.canvas.bind("<ButtonPress-1>", self.iniciar_arrastre)
+        self.canvas.bind("<B1-Motion>", self.arrastrar_plano)
+        self.canvas.bind("<ButtonRelease-1>", self.terminar_arrastre)
+        self.canvas.bind("<Double-Button-1>", self.centrar_vista)
 
     def crear_frame_derecho(self):
         # Frame derecho

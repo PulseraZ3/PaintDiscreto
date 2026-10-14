@@ -19,3 +19,28 @@ class Homotecia:
                     nuevo_grupo.append((nuevo_x, nuevo_y))
                 nuevo_puntos.append(nuevo_grupo)
             return nuevo_puntos
+
+    def aplicar_con_centro(self, puntos, factor, h, k):
+
+        if len(puntos) == 0:
+            return puntos
+
+        if isinstance(puntos[0][0], (int, float)):
+            nuevo_puntos = []
+            for punto in puntos:
+                x, y = punto
+                nuevo_x = h + factor * (x - h)
+                nuevo_y = k + factor * (y - k)
+                nuevo_puntos.append((nuevo_x, nuevo_y))
+            return nuevo_puntos
+        else:
+            nuevo_puntos = []
+            for grupo in puntos:
+                nuevo_grupo = []
+                for punto in grupo:
+                    x, y = punto
+                    nuevo_x = h + factor * (x - h)
+                    nuevo_y = k + factor * (y - k)
+                    nuevo_grupo.append((nuevo_x, nuevo_y))
+                nuevo_puntos.append(nuevo_grupo)
+            return nuevo_puntos

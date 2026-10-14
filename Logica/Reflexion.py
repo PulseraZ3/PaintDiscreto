@@ -52,7 +52,6 @@ class Reflexion:
             return nuevo_puntos
 
     def reflexion_recta(self, puntos, a, b, c):
-        print("VALORES RECIBIDOS:", a, b, c)
         if len(puntos) > 0 and isinstance(puntos[0][0],(int ,float)):
             nuevo_puntos = []
             for punto in puntos:
